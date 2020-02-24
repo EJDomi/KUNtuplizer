@@ -23,6 +23,13 @@ options.register('DataProcessing',
      'Data processing types. Options are:\
         Data_94x, MC_Fall17MiniAOD' )
 
+options.register('version',
+     'v14',
+     opts.VarParsing.multiplicity.singleton,
+     opts.VarParsing.varType.string,
+     'global tag version types. Options are:\
+        v14, v15' )
+
 options.register('outputLabel',
      'testNtuple.root',
      opts.VarParsing.multiplicity.singleton,
@@ -53,7 +60,8 @@ if options.globalTag != "":
   print "!!!!WARNING: You have chosen globalTag as", options.globalTag,". Please check if this corresponds to your dataset."
 else: 
   if options.DataProcessing=="Data_94x": options.globalTag="94X_dataRun2_v6"
-  elif options.DataProcessing=="MC_Fall17MiniAOD": options.globalTag="94X_mc2017_realistic_v14"
+  elif options.DataProcessing=="MC_Fall17MiniAOD" and options.version=="v14": options.globalTag="94X_mc2017_realistic_v14"
+  elif options.DataProcessing=="MC_Fall17MiniAOD" and options.version=="v15": options.globalTag="94X_mc2017_realistic_v15"
   else: sys.exit("!!!!ERROR: Enter 'DataProcessing' period. Options are: \
       'Data_94X', 'MC_Fall17MiniAOD' \n")
 
