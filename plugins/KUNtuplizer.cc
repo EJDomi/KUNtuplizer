@@ -250,6 +250,8 @@ KUNtuplizer::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetup)
    edm::Handle<reco::VertexCollection> vertices;
    iEvent.getByToken(vtxToken_, vertices);
    std::vector<reco::Vertex> goodvtx;
+   goodvtx.clear();
+
    if (vertices->empty()) return;
    //evt_.npv=0; 
    evt_.nGoodVtx = 0;
@@ -346,16 +348,16 @@ KUNtuplizer::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetup)
          }
       }
 
-      if (nbs > 0 && isg > 0) isgb = true;
-      else if (nbs > 0) isb = true;
-      else if (ncs > 0) isc = true;
-      else if (ngs > 0) isg = true;
-      else if (nss > 0) iss = true;
-      else if (nuds > 0) isud = true;
-      else isother = true;
+      if (nbs > 0 && ngs > 0) isgb = true;
+      if (nbs > 0) isb = true;
+      if (ncs > 0) isc = true;
+      if (ngs > 0) isg = true;
+      if (nss > 0) iss = true;
+      if (nuds > 0) isud = true;
+      //else isother = true;
        
       if(isb || isc || isother) {h1_["cutflow"] -> Fill(3, genwt);}
-      else continue;
+      //else continue;
 
       if(isb)                     {h1_["cutflow"] -> Fill(4, genwt);}
 
