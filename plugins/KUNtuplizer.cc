@@ -349,12 +349,12 @@ KUNtuplizer::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetup)
       }
 
       if (nbs > 0 && ngs > 0) isgb = true;
-      if (nbs > 0) isb = true;
-      if (ncs > 0) isc = true;
-      if (ngs > 0) isg = true;
-      if (nss > 0) iss = true;
-      if (nuds > 0) isud = true;
-      //else isother = true;
+      else if (nbs > 0) isb = true;
+      else if (ncs > 0) isc = true;
+      else if (ngs > 0) isg = true;
+      else if (nss > 0) iss = true;
+      else if (nuds > 0) isud = true;
+      else isother = true;
        
       if(isb || isc || isother) {h1_["cutflow"] -> Fill(3, genwt);}
       //else continue;
