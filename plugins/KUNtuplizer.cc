@@ -305,9 +305,9 @@ KUNtuplizer::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetup)
       h1_["cutflow"] -> Fill(2, genwt);
 
       //store the branches after gen particle matching
-      int nbs = 0.0, ngs = 0.0, ncs = 0.0, nuds = 0.0, nss = 0.0, nothers = 0;
+      int nbs = 0.0, ngs = 0.0, ncs = 0.0, nuds = 0.0, nss = 0.0, nmatchothers = 0, nothers = 0;
       bool isgb = false, isb = false, isc = false;
-      bool isg = false, iss = false, isud = false, isother = false;
+      bool isg = false, iss = false, isud = false, ismatchother = false, isother = false;
 
       bool isbMeson = false; bool isbBaryon = false; 
       bool iscMeson = false; bool iscBaryon = false;
@@ -344,8 +344,9 @@ KUNtuplizer::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetup)
             else if (pdgid == 21){ngs++;}
             else if (pdgid == 3 || pdgid == 130 || issMeson || issBaryon){nss++;}
             else if (pdgid == 2 || pdgid == 1 || isudMeson || isudBaryon){nuds++;}
-            else {nothers++;}
+            else {nmatchothers++;}
          }
+        else {nothers++;}
       }
 
       if (nbs > 0 && ngs > 0) isgb = true;
@@ -354,6 +355,7 @@ KUNtuplizer::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetup)
       else if (ngs > 0) isg = true;
       else if (nss > 0) iss = true;
       else if (nuds > 0) isud = true;
+      else if (nmatchothers > 0) ismatchother = true;
       else isother = true;
        
       if(isb || isc || isother) {h1_["cutflow"] -> Fill(3, genwt);}
@@ -388,7 +390,7 @@ KUNtuplizer::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetup)
       if(cut5 && cut6 && cut7)      {h1_["cutflow"] -> Fill(7, genwt);}//0.98
       
       //Number of tracks
-      double ndaus  = sv.numberOfDaughters();
+      int ndaus  = sv.numberOfDaughters();
       bool cut8 = ndaus > ndauSV_;
       if(cut5 && cut6 && cut7 && cut8)         {h1_["cutflow"] -> Fill(8, genwt);} //2 
       
@@ -425,6 +427,7 @@ KUNtuplizer::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetup)
       evt_.isG = isg;
       evt_.isS = iss;
       evt_.isUD = isud;
+      evt_.isMatchOther = ismatchother;
       evt_.isOther = isother;
 
       evt_.nB = nbs;
@@ -432,6 +435,7 @@ KUNtuplizer::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetup)
       evt_.nG = ngs;
       evt_.nS = nss;
       evt_.nUD = nuds;
+      evt_.nMatchOther = nmatchothers;
       evt_.nOther = nothers;
 
       //evt_.matchedGenPt = matchGenPt;
