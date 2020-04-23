@@ -34,5 +34,6 @@ makeNtuples = cms.EDAnalyzer('KUNtuplizer',
     subjetsAk8        = cms.InputTag("slimmedJetsAK8PFCHSSoftDropPacked:SubJets"),
     triggerResults    = cms.InputTag("TriggerResults"),
     triggerSummary    = cms.InputTag("hltTriggerSummaryAOD"),
-    hltElectronFilter = cms.InputTag("hltL1sL1Mu3p5EG12ORL1MuOpenEG12L3Filtered8")
+    hltElectronFilter = cms.InputTag("hltL1sL1Mu3p5EG12ORL1MuOpenEG12L3Filtered8"),
+    sv_model_file     = cms.string("nano_train_model.json")
 )

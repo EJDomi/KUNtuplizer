@@ -37,7 +37,7 @@ class EventInfoTree {
     float d3derr;
     float d3dsig;
     float costhetaSvPv;
-    float   ntrk;
+    int   ntrk_;
     float   ndau;
     float   ndof;
     int   isB;
@@ -59,8 +59,42 @@ class EventInfoTree {
     float matchedGenEta;
     float matchedGenMass;
     float matchedGenPhi;
+    float ProbB;
+    float ProbC;
 
-    //void clearTreeVectors() {
+    // track variables
+    static constexpr size_t max_trk=10;
+    float trkDeltaRSV[max_trk];
+    float trkPtRelSV[max_trk];
+    float trkEtaSV[max_trk];
+    float trkEtaRelSV[max_trk];
+    float trkPParSV[max_trk];
+    float trkPtRatioSV[max_trk];  
+    float trkPParRatioSV[max_trk];   
+    float trkSip2dValSV[max_trk];
+    float trkSip2dSigSV[max_trk];
+    float trkSip3dValSV[max_trk];
+    float trkSip3dSigSV[max_trk];
+    float trkSVDistValSV[max_trk];
+    float trkSVDistSigSV[max_trk];
+
+
+
+
+   void clearTreeVectors() {
+      //std::fill(std::begin(trkDeltaRSV), std::end(trkDeltaRSV), 0.);
+      //std::fill(std::begin(trkPtRelSV), std::end(trkPtRelSV), 0.);
+      //std::fill(std::begin(trkEtaSV), std::end(trkEtaSV), 0.);
+      //std::fill(std::begin(trkEtaRelSV), std::end(trkEtaRelSV), 0.);
+      //std::fill(std::begin(trkPParSV), std::end(trkPParSV), 0.);
+      //std::fill(std::begin(trkPtRatioSV), std::end(trkPtRatioSV), 0.);
+      //std::fill(std::begin(trkPParRatioSV), std::end(trkPParRatioSV), 0.);
+      //std::fill(std::begin(trkSip2dValSV), std::end(trkSip2dValSV), 0.);
+      //std::fill(std::begin(trkSip2dSigSV), std::end(trkSip2dSigSV), 0.);
+      //std::fill(std::begin(trkSip3dValSV), std::end(trkSip3dValSV), 0.);
+      //std::fill(std::begin(trkSip3dSigSV), std::end(trkSip3dSigSV), 0.);
+      //std::fill(std::begin(trkSVDistValSV), std::end(trkSVDistValSV), 0.);
+      //std::fill(std::begin(trkSVDistSigSV), std::end(trkSVDistSigSV), 0.);
     //   ndofVtx.clear();
     //   chi2Vtx.clear();
     //   zVtx.clear();
@@ -92,7 +126,7 @@ class EventInfoTree {
     //   matchedGenEta.clear();
     //   matchedGenMass.clear();
     //   matchedGenPhi.clear();
-    //}
+    }
 
     void RegisterTree(TTree* tree, std::string name="SV") {
       //tree->Branch((name+"_countEvents").c_str(), &countEvents, (name+"_countEvents/I").c_str());
@@ -127,7 +161,7 @@ class EventInfoTree {
       tree->Branch((name+"_d3derr").c_str(),        &d3derr, (name+"_d3derr/F").c_str()); 
       tree->Branch((name+"_d3dsig").c_str(),        &d3dsig, (name+"_d3dsig/F").c_str());
       tree->Branch((name+"_costhetaSvPv").c_str(),  &costhetaSvPv, (name+"_costhetaSvPv/F").c_str()); 
-      tree->Branch((name+"_ntrk").c_str(),          &ntrk, (name+"_ntrk/F").c_str());
+      tree->Branch((name+"_ntrk_").c_str(),          &ntrk_, (name+"_ntrk_/I").c_str());
       tree->Branch((name+"_ndau").c_str(),          &ndau, (name+"_ndau/F").c_str());
       tree->Branch((name+"_ndof").c_str(),          &ndof, (name+"_ndof/F").c_str());
       tree->Branch((name+"_isB").c_str(),           &isB, (name+"_isB/i").c_str());
@@ -145,10 +179,28 @@ class EventInfoTree {
       tree->Branch((name+"_nUD").c_str(),           &nUD, (name+"_nUD/I").c_str());
       tree->Branch((name+"_nMatchOther").c_str(),         &nMatchOther, (name+"_nMatchOther/I").c_str());
       tree->Branch((name+"_nOther").c_str(),         &nOther, (name+"_nOther/I").c_str());
+      tree->Branch((name+"_ProbB").c_str(),         &ProbB, (name+"_ProbB/F").c_str());
+      tree->Branch((name+"_ProbC").c_str(),         &ProbB, (name+"_ProbC/F").c_str());
       //tree->Branch((name+"_matchedGenPt").c_str(),  &matchedGenPt, (name+"_matchedGenPt").c_str());
       //tree->Branch((name+"_matchedGenEta").c_str(), &matchedGenEta, (name+"_matchedGenEta").c_str());
       //tree->Branch((name+"_matchedGenMass").c_str(),&matchedGenMass, (name+"_matchedGenMass").c_str());
       //tree->Branch((name+"_matchedGenPhi").c_str(), &matchedGenPhi, (name+"_matchedGenPhi").c_str());
+      //
+      // track variables
+      tree->Branch((name+"_trkDeltaRSV").c_str(), &trkDeltaRSV, (name+"_trkDeltaRSV["+name+"_ntrk_]/F").c_str());
+      tree->Branch((name+"_trkPtRelSV").c_str(), &trkPtRelSV, (name+"_trkPtRelSV["+name+"_ntrk_]/F").c_str());
+      tree->Branch((name+"_trkEtaSV").c_str(), &trkEtaSV, (name+"_trkEtaSV["+name+"_ntrk_]/F").c_str());
+      tree->Branch((name+"_trkEtaRelSV").c_str(), &trkEtaRelSV, (name+"_trkEtaRelSV["+name+"_ntrk_]/F").c_str());
+      tree->Branch((name+"_trkPParSV").c_str(), &trkPParSV, (name+"_trkPParSV["+name+"_ntrk_]/F").c_str());
+      tree->Branch((name+"_trkPtRatioSV").c_str(), &trkPtRatioSV, (name+"_trkPtRatioSV["+name+"_ntrk_]/F").c_str());
+      tree->Branch((name+"_trkPParRatioSV").c_str(), &trkPParRatioSV, (name+"_trkPParRatioSV["+name+"_ntrk_]/F").c_str());
+      tree->Branch((name+"_trkSip2dValSV").c_str(), &trkSip2dValSV, (name+"_trkSip2dValSV["+name+"_ntrk_]/F").c_str());
+      tree->Branch((name+"_trkSip2dSigSV").c_str(), &trkSip2dSigSV, (name+"_trkSip2dSigSV["+name+"_ntrk_]/F").c_str());
+      tree->Branch((name+"_trkSip3dValSV").c_str(), &trkSip3dValSV, (name+"_trkSip3dValSV["+name+"_ntrk_]/F").c_str());
+      tree->Branch((name+"_trkSip3dSigSV").c_str(), &trkSip3dSigSV, (name+"_trkSip3dSigSV["+name+"_ntrk_]/F").c_str());
+      tree->Branch((name+"_trkSVDistValSV").c_str(), &trkSVDistValSV, (name+"_trkSVDistValSV["+name+"_ntrk_]/F").c_str());
+      tree->Branch((name+"_trkSVDistSigSV").c_str(), &trkSVDistSigSV, (name+"_trkSVDistSigSV["+name+"_ntrk_]/F").c_str());
+
    
     }
 };

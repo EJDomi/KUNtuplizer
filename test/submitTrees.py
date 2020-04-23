@@ -42,14 +42,14 @@ def main():
     # We want to put all the CRAB project directories from the tasks we submit here into one common directory.
     # That's why we need to set this parameter (here or above in the configuration file, it does not matter, we will not overwrite it).
     config.section_("General")
-    config.General.workArea = 'crab_svTuples_dr0p05_pt20_new'
+    config.General.workArea = 'crab_svTuples_trkVar_new'
     config.General.transferLogs = True
 
     config.section_("JobType")
     config.JobType.pluginName = 'Analysis'
     config.JobType.psetName = 'NtupleMaker_cfg.py' 
     config.JobType.pyCfgParams = None 
-    config.JobType.inputFiles = [ ]
+    config.JobType.inputFiles = ['nano_train_model.json']
     config.JobType.maxMemoryMB = 2500
     config.JobType.allowUndistributedCMSSW = True
 
@@ -59,7 +59,7 @@ def main():
     config.Data.unitsPerJob = 2
     config.Data.ignoreLocality = False
     config.Data.publication = False     
-    config.Data.outLFNDirBase = '/store/user/eschmitz/svTuples/deltaR_0p05_pt20_new/'
+    config.Data.outLFNDirBase = '/store/user/eschmitz/svTuples/trkVar/trk_fix/'
     
     config.section_("Site")
     config.Site.storageSite = 'T2_US_Nebraska'

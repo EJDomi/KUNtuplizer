@@ -47,6 +47,15 @@
 #include "DataFormats/PatCandidates/interface/Muon.h"
 #include "DataFormats/MuonReco/interface/MuonCocktails.h"
 #include "DataFormats/GeometryCommonDetAlgo/interface/Measurement1D.h"
+#include "DataFormats/JetReco/interface/GenJet.h"
+#include "DataFormats/BTauReco/interface/SecondaryVertexTagInfo.h"
+#include "DataFormats/BTauReco/interface/CandSecondaryVertexTagInfo.h"
+#include "DataFormats/BTauReco/interface/TaggingVariable.h"
+#include "DataFormats/BTauReco/interface/VertexTypes.h"
+#include "DataFormats/BTauReco/interface/ParticleMasses.h"
+#include "DataFormats/PatCandidates/interface/PackedCandidate.h"
+#include "DataFormats/PatCandidates/interface/PackedGenParticle.h"
+#include "DataFormats/PatCandidates/interface/Muon.h"
 #include "DataFormats/PatCandidates/interface/Electron.h"
 #include "DataFormats/PatCandidates/interface/Jet.h"
 #include "DataFormats/JetReco/interface/GenJet.h"
@@ -77,6 +86,8 @@
 #include "TLorentzVector.h"
 #include "DataFormats/Math/interface/LorentzVector.h"
 #include <Math/VectorUtil.h>
+#include "Framework/KUNtuplizer/interface/SVDiscrTool.hh"
+#include "Framework/KUNtuplizer/src/SVDiscrTool.cc"
 //
 // class declaration
 //
@@ -130,6 +141,8 @@ class KUNtuplizer : public edm::one::EDAnalyzer<edm::one::SharedResources>  {
    double        jetdRSV_;
    //double        ak4ptmax_;
    double        genPartdRSV_;
+   std::string   sv_model_file_;
+   SVDiscrTool   m_SVDiscrTool;
 };
 
 //
@@ -167,7 +180,8 @@ KUNtuplizer::KUNtuplizer(const edm::ParameterSet& iConfig):
    ndauSV_         (iConfig.getParameter<int>("ndauSV")),
    jetdRSV_        (iConfig.getParameter<double>("jetdRSV")),
    //ak4ptmax_       (iConfig.getParameter<double>("ak4ptmax")),
-   genPartdRSV_    (iConfig.getParameter<double>("genPartdRSV"))
+   genPartdRSV_    (iConfig.getParameter<double>("genPartdRSV")),
+   sv_model_file_  (iConfig.getParameter<std::string>("sv_model_file"))
                     
 {
    consumes<std::vector<PileupSummaryInfo>>(puInfo_);
@@ -195,7 +209,7 @@ KUNtuplizer::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetup)
 {
    using namespace edm; 
    genevt_.clearTreeVectors(); 
-   //evt_.clearTreeVectors(); 
+   evt_.clearTreeVectors(); 
 
    //Generator weights
    float genwt = 1.0;
@@ -295,14 +309,24 @@ KUNtuplizer::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetup)
     
    VertexDistance3D vdist;  
    VertexDistanceXY vdistXY;
-   
+  
+   edm::ESHandle<TransientTrackBuilder> builder_;
+   iSetup.get<TransientTrackRecord>().get("TransientTrackBuilder", builder_);
+
+
+ 
    for (const auto & sv : *secVertices) {
 
-      h1_["cutflow"] -> Fill(1, genwt);
  
       //sum pt of all tracks in SV
       if(sv.pt() > ptMaxSV_) continue;//20
-      h1_["cutflow"] -> Fill(2, genwt);
+
+     //SV direction vector, SV flight direction w.r.t PV 
+      math::XYZVector svDirU = sv.momentum().Unit();
+      TVector3 svDir3(svDirU.x(), svDirU.y(), svDirU.z());      
+      GlobalVector svDir(sv.px(), sv.py(), sv.pz());
+      GlobalVector svDirPV(sv.vertex().x() - pv.x(), sv.vertex().y() - pv.y(), sv.vertex().z() - pv.z()); 
+
 
       //store the branches after gen particle matching
       int nbs = 0.0, ngs = 0.0, ncs = 0.0, nuds = 0.0, nss = 0.0, nmatchothers = 0, nothers = 0;
@@ -358,14 +382,9 @@ KUNtuplizer::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetup)
       else if (nmatchothers > 0) ismatchother = true;
       else isother = true;
        
-      if(isb || isc || isother) {h1_["cutflow"] -> Fill(3, genwt);}
       //else continue;
 
-      if(isb)                     {h1_["cutflow"] -> Fill(4, genwt);}
 
-      // rest of the selections will be stored as cutflow but will be not applied to store the ntuple branches
-      // ------------------------------
-      
       //SV track separation from jets     
       bool isInJetDir = false;      
       for (const pat::Jet & jet : *ak4jets ){
@@ -374,32 +393,112 @@ KUNtuplizer::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetup)
          if(reco::deltaR(flightDir, jetDir ) <=  jetdRSV_) {//0.4
             isInJetDir = true; break;}
       }
-      bool cut5 = !isInJetDir; 
-      if(cut5)                      {h1_["cutflow"] -> Fill(5, genwt);}
       
       //distance in the transverse plane between the SV and PV
       Measurement1D d2d= vdistXY.distance(pv, VertexState(RecoVertex::convertPos(sv.position()), RecoVertex::convertError(sv.error()))); 
-      bool cut6 = d2d.value() < d2dSV_;
-      if(cut5 && cut6)              {h1_["cutflow"] -> Fill(6, genwt);} //3
       
       //pointing angle (i.e. the angle between the sum of the momentum of the 
       //tracks in the SV and the flight direction betwen PV and SV)  
       double dx = (sv.vx() - pv.x()), dy = (sv.vy() - pv.y()), dz = (sv.vz() - pv.z());    
       double cosPdotV = (dx * sv.px() + dy*sv.py() + dz*sv.pz())/(sv.p()*std::sqrt(dx * dx + dy * dy + dz * dz));
-      bool cut7 =  cosPdotV > cosPdotVSV_;    
-      if(cut5 && cut6 && cut7)      {h1_["cutflow"] -> Fill(7, genwt);}//0.98
       
       //Number of tracks
       int ndaus  = sv.numberOfDaughters();
-      bool cut8 = ndaus > ndauSV_;
-      if(cut5 && cut6 && cut7 && cut8)         {h1_["cutflow"] -> Fill(8, genwt);} //2 
       
       //significance of distance in 3d space point between the SV and PV
       Measurement1D dl= vdist.distance(pv, VertexState(RecoVertex::convertPos(sv.position()), RecoVertex::convertError(sv.error())));
-      bool cut9 = dl.significance() > dlenSigSV_;
-      if(cut5 && cut6 && cut7 && cut8 && cut9) {h1_["cutflow"] -> Fill(9, genwt);}//4
+     
+
+      std::map<std::string, double> sv_map;
+
+      sv_map["Evt_pt"] = sv.pt();
+      sv_map["Evt_eta"] = sv.eta();
+      sv_map["Evt_mass"] = sv.mass();
+      sv_map["Evt_d3d"] = dl.value();
+      sv_map["Evt_d3dsig"] = dl.significance();
+      sv_map["Evt_dxy"] = d2d.value();
+      sv_map["Evt_costhetaSvPv"] = cosPdotV;
+      sv_map["Evt_ndof"] = sv.vertexNdof();
+
+      std::map<std::string, double> probs = m_SVDiscrTool.PROB(sv_map); 
+
+      double probb, probc;
       
+      probb = probs["prob_isB"];
+      probc = probs["prob_isC"];
+
+     //Add track based info
+      double trackDeltaR(0.);   double trackPtRel(0.);   double trackPtRatio(0.);
+      double trackEta(0.);      double trackEtaRel(0.);  double trackPPar(0.);     double trackPParRatio(0.);
+      double trackSip2dVal(0.); double trackSip2dSig(0.);double trackSip3dVal(0.); double trackSip3dSig(0.);
+      double trackSVDistVal(0.);double trackSVDistSig(0.);
+
+      int ntrk = 0;
+
+      for (unsigned int i = 0; i < sv.numberOfDaughters(); i++) {
+        auto const* cand = sv.daughter(i);
+        auto packed_cand = dynamic_cast<const pat::PackedCandidate*>(cand);
+        auto pf_cand = dynamic_cast<const reco::PFCandidate*>(cand);
+
+        // deal with PAT/AOD polymorphism to get the track
+        const reco::Track *track_ptr = nullptr;
+
+        if (pf_cand){
+           track_ptr = pf_cand->bestTrack();  // trackRef was sometimes null
+        }
+        else if (packed_cand && packed_cand->hasTrackDetails()){ // if no track info is available, this will give an exception
+           track_ptr = &(packed_cand->pseudoTrack());
+        }
+
+        math::XYZVector trackMom = track_ptr->momentum();
+        double trackMag          = std::sqrt(trackMom.Mag2());
+        TVector3 trackMom3(trackMom.x(), trackMom.y(), trackMom.z()); 
+
       //Fill the branches
+        trackDeltaR    = reco::deltaR(trackMom, svDirU);
+        trackPtRel     = trackMom3.Perp(svDir3); 
+        trackEta       = trackMom.Eta();
+        trackEtaRel    = reco::btau::etaRel(svDirU, trackMom);
+        trackPPar      = svDirU.Dot(trackMom);
+        trackPtRatio   = trackMom3.Perp(svDir3) / trackMag;
+        trackPParRatio = svDirU.Dot(trackMom) / trackMag;
+
+        // Use transient track that has a pointer to the magnetic field, and geometry to estimate  
+        // track parameters along the track trajectory 
+        reco::TransientTrack transientTrack;
+        transientTrack = builder_->build(*track_ptr);
+
+        //Extrapolate the track to the point of closest approach to the PV in transverse (3D) plane to compute IP and its error
+        Measurement1D meas_ip2d = IPTools::signedTransverseImpactParameter(transientTrack, svDir, pv).second;
+        Measurement1D meas_ip3d = IPTools::signedImpactParameter3D(transientTrack, svDir, pv).second;
+        trackSip2dVal = static_cast<float>(meas_ip2d.value());
+        trackSip2dSig = static_cast<float>(meas_ip2d.significance());
+        trackSip3dVal = static_cast<float>(meas_ip3d.value());
+        trackSip3dSig = static_cast<float>(meas_ip3d.significance());
+
+        //Extrapolate the track to the point of closest approach to the SV axis
+        Measurement1D svdist = IPTools::jetTrackDistance(transientTrack, svDir, pv).second;
+        trackSVDistVal = static_cast<float>(svdist.value());
+        trackSVDistSig = static_cast<float>(svdist.significance());
+        // Fill the branches 
+        if(int(EventInfoTree::max_trk) > ntrk){
+        evt_.trkDeltaRSV[ntrk] = trackDeltaR; 
+        evt_.trkPtRelSV[ntrk] = trackPtRel; 
+        evt_.trkEtaSV[ntrk] = trackEta; 
+        evt_.trkEtaRelSV[ntrk] = trackEtaRel; 
+        evt_.trkPParSV[ntrk] = trackPPar;
+        evt_.trkPtRatioSV[ntrk] = trackPtRatio;
+        evt_.trkPParRatioSV[ntrk] = trackPParRatio; 
+        evt_.trkSip2dValSV[ntrk] = trackSip2dVal;
+        evt_.trkSip2dSigSV[ntrk] = trackSip2dSig;
+        evt_.trkSip3dValSV[ntrk] = trackSip3dVal;
+        evt_.trkSip3dSigSV[ntrk] = trackSip3dSig;
+        evt_.trkSVDistValSV[ntrk] = trackSVDistVal;
+        evt_.trkSVDistSigSV[ntrk] = trackSVDistSig; 
+        ntrk++;
+        }
+      }
+      evt_.ntrk_ = ntrk;
       //evt_.nGoodSV++;
       evt_.pt = sv.pt(); 
       evt_.eta = sv.eta();
@@ -416,7 +515,6 @@ KUNtuplizer::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetup)
       evt_.d3derr = dl.error();
       evt_.d3dsig = dl.significance();
       evt_.costhetaSvPv = cosPdotV;
-      evt_.ntrk = sv.numberOfSourceCandidatePtrs();
       evt_.ndau = ndaus;
       evt_.ndof = sv.vertexNdof();
 
@@ -437,6 +535,8 @@ KUNtuplizer::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetup)
       evt_.nUD = nuds;
       evt_.nMatchOther = nmatchothers;
       evt_.nOther = nothers;
+      evt_.ProbB = probb;
+      evt_.ProbC = probc;
 
       //evt_.matchedGenPt = matchGenPt;
       //evt_.matchedGenEta = matchGenEta;
@@ -469,17 +569,8 @@ KUNtuplizer::beginJob()
    tree_ = fs_->make<TTree>("svtree", "svtree") ;
    evt_.RegisterTree(tree_, "Evt") ;
    genevt_.RegisterTree(tree_, "GenEvt") ;
-
-   h1_["cutflow"] = fs_->make<TH1D>("cutflow SV", "cut flow", 9, 0.5, 9.5) ;
-   h1_["cutflow"] -> GetXaxis() -> SetBinLabel(1, "allSV") ;
-   h1_["cutflow"] -> GetXaxis() -> SetBinLabel(2, "SV p_{T} #leq 20") ;
-   h1_["cutflow"] -> GetXaxis() -> SetBinLabel(3, "#DeltaR(SV,pgen)>0.4") ;
-   h1_["cutflow"] -> GetXaxis() -> SetBinLabel(4, "#DeltaR(SV,bgen)>0.4") ;
-   h1_["cutflow"] -> GetXaxis() -> SetBinLabel(5, "#DeltaR(SV,j)>0.4") ;
-   h1_["cutflow"] -> GetXaxis() -> SetBinLabel(6, "IP2D < 3") ;
-   h1_["cutflow"] -> GetXaxis() -> SetBinLabel(7, "cos#theta_{PV,SV} > 0.98") ;
-   h1_["cutflow"] -> GetXaxis() -> SetBinLabel(8, "ndau > 2") ; 
-   h1_["cutflow"] -> GetXaxis() -> SetBinLabel(9, "SIP3D > 4") ;    
+   m_SVDiscrTool.CreateNN(sv_model_file_);
+   
 }
 
 // ------------ method called once each job just after ending the event loop  ------------
