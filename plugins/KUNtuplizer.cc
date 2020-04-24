@@ -254,22 +254,22 @@ KUNtuplizer::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetup)
    edm::Handle<std::vector< PileupSummaryInfo > > puInfo;
    iEvent.getByLabel(puInfo_, puInfo);
    std::vector<PileupSummaryInfo>::const_iterator pvi;
-   //for(pvi = puInfo->begin(); pvi != puInfo->end(); ++pvi) {
-   //   evt_.npuTrue = pvi->getTrueNumInteractions(); 
-   //   evt_.npuInt = pvi->getBunchCrossing(); 
-   //   evt_.puBX = pvi->getPU_NumInteractions();
-   //}
+   for(pvi = puInfo->begin(); pvi != puInfo->end(); ++pvi) {
+      evt_.npuTrue = pvi->getTrueNumInteractions(); 
+      evt_.npuInt = pvi->getBunchCrossing(); 
+      evt_.puBX = pvi->getPU_NumInteractions();
+   }
    
    // Vertex
    edm::Handle<reco::VertexCollection> vertices;
    iEvent.getByToken(vtxToken_, vertices);
+
    std::vector<reco::Vertex> goodvtx;
    goodvtx.clear();
 
    if (vertices->empty()) return;
-   //evt_.npv=0; 
    evt_.nGoodVtx = 0;
-   //evt_.npv = vertices->size();
+   evt_.npv = vertices->size();
    
    int prVtx = -1;
    // store the vertex related variables after basic PV selection
@@ -279,11 +279,12 @@ KUNtuplizer::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetup)
       if (fabs(vertices->at(i).position().z()) > zPV_) continue;
       if (vertices->at(i).position().rho() > rhoPV_) continue;    
       if (prVtx < 0) {prVtx = i; }
-      //evt_.ndofVtx.push_back(vertices->at(i).ndof());
-      //evt_.chi2Vtx.push_back(vertices->at(i).chi2());
-      //evt_.zVtx.push_back(vertices->at(i).position().z());
-      //evt_.rhoVtx.push_back(vertices->at(i).position().rho());
-      //evt_.ptVtx.push_back(vertices->at(i).p4().pt());
+      evt_.ndofVtx.push_back(vertices->at(i).ndof());
+      evt_.chi2Vtx.push_back(vertices->at(i).chi2());
+      evt_.zVtx.push_back(vertices->at(i).position().z());
+      evt_.rhoVtx.push_back(vertices->at(i).position().rho());
+      evt_.etaVtx.push_back(vertices->at(i).position().eta());
+      evt_.phiVtx.push_back(vertices->at(i).position().phi());
       goodvtx.push_back(vertices->at(i));
       evt_.nGoodVtx++;
    }
@@ -304,8 +305,8 @@ KUNtuplizer::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetup)
    // Secondary Vertices
    edm::Handle<reco::VertexCompositePtrCandidateCollection> secVertices;
    iEvent.getByToken(svToken_, secVertices);
-   //evt_.nSV = 0; evt_.nGoodSV = 0;
-   //evt_.nSV = secVertices->size();
+   evt_.nSV = 0; evt_.nGoodSV = 0;
+   evt_.nSV = secVertices->size();
     
    VertexDistance3D vdist;  
    VertexDistanceXY vdistXY;
@@ -329,6 +330,12 @@ KUNtuplizer::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetup)
 
 
       //store the branches after gen particle matching
+      
+      float genSVdR = -1000.0; float matchGenSVdR = -1000.0;
+      int matchGenMomID = 0; bool matchGenIsHardProcess = false; bool matchGenIsLastCopyBeforeFSR = false;     
+      float matchGenPt = -1000.0; float matchGenEta = -1000.0; float matchGenMass = -1000.0; 
+      float matchGenPhi = -1000.0; float matchGenEnergy = -1000.0;
+
       int nbs = 0.0, ngs = 0.0, ncs = 0.0, nuds = 0.0, nss = 0.0, nmatchothers = 0, nothers = 0;
       bool isgb = false, isb = false, isc = false;
       bool isg = false, iss = false, isud = false, ismatchother = false, isother = false;
@@ -338,17 +345,20 @@ KUNtuplizer::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetup)
       bool issMeson = false; bool issBaryon = false;
       bool isudMeson = false; bool isudBaryon = false;
 
+      bool fill1stHeavyGen = false;
+      bool fill1stNotHeavyGen = false;
+      float mindR = 100.0; float maxdR = 0.0;
+
       //float matchGenPt = 0.0, matchGenEta = 0.0, matchGenMass = 0.0, matchGenPhi = 0.0;
 
       //for (const pat::PackedGenParticle & gp : *genParts) {
       for (const reco::GenParticle & gp : *genParts) {
-         if(reco::deltaR(gp.p4(), sv.p4()) <= genPartdRSV_){//0.4
-            
-            //matchGenPt   = gp.p4().pt();
-            //matchGenEta  = gp.p4().eta();
-            //matchGenPhi  = gp.p4().phi();
-            //matchGenMass = gp.p4().mass();
+         genSVdR = reco::deltaR(gp.p4(), sv.p4());
+         if (genSVdR <= mindR) { mindR = genSVdR;}
+         if (genSVdR > maxdR)  { maxdR = genSVdR;}
 
+         if(genSVdR <= genPartdRSV_){//0.4
+            
             int pdgid = abs(gp.pdgId());
 
             isbMeson = pdgid%1000 > 500 && pdgid%1000 < 600;
@@ -369,7 +379,32 @@ KUNtuplizer::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetup)
             else if (pdgid == 3 || pdgid == 130 || issMeson || issBaryon){nss++;}
             else if (pdgid == 2 || pdgid == 1 || isudMeson || isudBaryon){nuds++;}
             else {nmatchothers++;}
+
+            if (nbs+ncs == 0 && fill1stNotHeavyGen == false){                           
+               matchGenSVdR   = genSVdR; 
+               matchGenPt     = gp.p4().pt();               
+               matchGenEta    = gp.p4().eta();
+               matchGenPhi    = gp.p4().phi();
+               matchGenMass   = gp.p4().mass();
+               matchGenEnergy = gp.p4().energy();
+               matchGenMomID               = gp.mother()->pdgId();               
+               matchGenIsHardProcess       = gp.isHardProcess();              
+               matchGenIsLastCopyBeforeFSR = gp.statusFlags().isLastCopyBeforeFSR();               
+               fill1stNotHeavyGen = true;               
+            }// if a b or c quark is found, then overwrite the P4 to the leading one
+            else if (nbs+ncs != 0 && fill1stHeavyGen == false) {
+               matchGenSVdR   = genSVdR; 
+               matchGenPt     = gp.p4().pt();
+               matchGenEta    = gp.p4().eta();
+               matchGenPhi    = gp.p4().phi();
+               matchGenMass   = gp.p4().mass();
+               matchGenEnergy = gp.p4().energy();
+               matchGenMomID               = gp.mother()->pdgId();
+               matchGenIsHardProcess       = gp.isHardProcess();
+               matchGenIsLastCopyBeforeFSR = gp.statusFlags().isLastCopyBeforeFSR();
+               fill1stHeavyGen = true;
          }
+        }
         else {nothers++;}
       }
 
@@ -409,6 +444,7 @@ KUNtuplizer::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetup)
       Measurement1D dl= vdist.distance(pv, VertexState(RecoVertex::convertPos(sv.position()), RecoVertex::convertError(sv.error())));
      
 
+      //calculate sv b-tag discriminator
       std::map<std::string, double> sv_map;
 
       sv_map["Evt_pt"] = sv.pt();
@@ -427,13 +463,12 @@ KUNtuplizer::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetup)
       probb = probs["prob_isB"];
       probc = probs["prob_isC"];
 
+
      //Add track based info
       double trackDeltaR(0.);   double trackPtRel(0.);   double trackPtRatio(0.);
       double trackEta(0.);      double trackEtaRel(0.);  double trackPPar(0.);     double trackPParRatio(0.);
       double trackSip2dVal(0.); double trackSip2dSig(0.);double trackSip3dVal(0.); double trackSip3dSig(0.);
       double trackSVDistVal(0.);double trackSVDistSig(0.);
-
-      int ntrk = 0;
 
       for (unsigned int i = 0; i < sv.numberOfDaughters(); i++) {
         auto const* cand = sv.daughter(i);
@@ -480,71 +515,75 @@ KUNtuplizer::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetup)
         Measurement1D svdist = IPTools::jetTrackDistance(transientTrack, svDir, pv).second;
         trackSVDistVal = static_cast<float>(svdist.value());
         trackSVDistSig = static_cast<float>(svdist.significance());
-        // Fill the branches 
-        if(int(EventInfoTree::max_trk) > ntrk){
-        evt_.trkDeltaRSV[ntrk] = trackDeltaR; 
-        evt_.trkPtRelSV[ntrk] = trackPtRel; 
-        evt_.trkEtaSV[ntrk] = trackEta; 
-        evt_.trkEtaRelSV[ntrk] = trackEtaRel; 
-        evt_.trkPParSV[ntrk] = trackPPar;
-        evt_.trkPtRatioSV[ntrk] = trackPtRatio;
-        evt_.trkPParRatioSV[ntrk] = trackPParRatio; 
-        evt_.trkSip2dValSV[ntrk] = trackSip2dVal;
-        evt_.trkSip2dSigSV[ntrk] = trackSip2dSig;
-        evt_.trkSip3dValSV[ntrk] = trackSip3dVal;
-        evt_.trkSip3dSigSV[ntrk] = trackSip3dSig;
-        evt_.trkSVDistValSV[ntrk] = trackSVDistVal;
-        evt_.trkSVDistSigSV[ntrk] = trackSVDistSig; 
-        ntrk++;
-        }
+
+        // Fill the branches
+        evt_.trkDeltaRSV.push_back(trackDeltaR); 
+        evt_.trkPtRelSV.push_back(trackPtRel); 
+        evt_.trkEtaSV.push_back(trackEta); 
+        evt_.trkEtaRelSV.push_back(trackEtaRel); 
+        evt_.trkPParSV.push_back(trackPPar);
+        evt_.trkPtRatioSV.push_back(trackPtRatio);
+        evt_.trkPParRatioSV.push_back(trackPParRatio); 
+        evt_.trkSip2dValSV.push_back(trackSip2dVal);
+        evt_.trkSip2dSigSV.push_back(trackSip2dSig);
+        evt_.trkSip3dValSV.push_back(trackSip3dVal);
+        evt_.trkSip3dSigSV.push_back(trackSip3dSig);
+        evt_.trkSVDistValSV.push_back(trackSVDistVal);
+        evt_.trkSVDistSigSV.push_back(trackSVDistSig); 
       }
-      evt_.ntrk_ = ntrk;
-      //evt_.nGoodSV++;
-      evt_.pt = sv.pt(); 
-      evt_.eta = sv.eta();
-      evt_.phi = sv.phi();
-      evt_.energy = sv.energy();
-      evt_.mass = sv.mass();
-      evt_.chi2 = sv.vertexChi2(); 
-      evt_.normChi2 = sv.vertexNormalizedChi2();
-      evt_.dxy = d2d.value();
-      //evt_.dxyerr = catchInfsAndBound(d2d.error()-2,0,-2,0);
-      evt_.dxyerr = d2d.error();
-      evt_.dxysig = d2d.significance();  
-      evt_.d3d = dl.value();
-      evt_.d3derr = dl.error();
-      evt_.d3dsig = dl.significance();
-      evt_.costhetaSvPv = cosPdotV;
-      evt_.ndau = ndaus;
-      evt_.ndof = sv.vertexNdof();
 
-      evt_.isMatchedToJet = isInJetDir;
-      evt_.isB = isb;
-      evt_.isGB = isgb;
-      evt_.isC = isc;
-      evt_.isG = isg;
-      evt_.isS = iss;
-      evt_.isUD = isud;
-      evt_.isMatchOther = ismatchother;
-      evt_.isOther = isother;
+      evt_.nGoodSV++;
+      evt_.pt.push_back(sv.pt()); 
+      evt_.eta.push_back(sv.eta());
+      evt_.phi.push_back(sv.phi());
+      evt_.energy.push_back(sv.energy());
+      evt_.mass.push_back(sv.mass());
+      evt_.chi2.push_back(sv.vertexChi2()); 
+      evt_.normChi2.push_back(sv.vertexNormalizedChi2());
+      evt_.dxy.push_back(d2d.value());
+      evt_.dxyerr.push_back(d2d.error());
+      evt_.dxysig.push_back(d2d.significance());  
+      evt_.d3d.push_back(dl.value());
+      evt_.d3derr.push_back(dl.error());
+      evt_.d3dsig.push_back(dl.significance());
+      evt_.costhetaSvPv.push_back(cosPdotV);
+      evt_.ndau.push_back(ndaus);
+      evt_.ndof.push_back(sv.vertexNdof());
 
-      evt_.nB = nbs;
-      evt_.nC = ncs;
-      evt_.nG = ngs;
-      evt_.nS = nss;
-      evt_.nUD = nuds;
-      evt_.nMatchOther = nmatchothers;
-      evt_.nOther = nothers;
-      evt_.ProbB = probb;
-      evt_.ProbC = probc;
+      evt_.isMatchedToJet.push_back(isInJetDir);
+      evt_.isB.push_back(isb);
+      evt_.isGB.push_back(isgb);
+      evt_.isC.push_back(isc);
+      evt_.isG.push_back(isg);
+      evt_.isS.push_back(iss);
+      evt_.isUD.push_back(isud);
+      evt_.isMatchOther.push_back(ismatchother);
+      evt_.isOther.push_back(isother);
 
-      //evt_.matchedGenPt = matchGenPt;
-      //evt_.matchedGenEta = matchGenEta;
-      //evt_.matchedGenMass = matchGenMass;
-      //evt_.matchedGenPhi = matchGenPhi;
-      tree_->Fill();
+      evt_.nB.push_back(nbs);
+      evt_.nC.push_back(ncs);
+      evt_.nG.push_back(ngs);
+      evt_.nS.push_back(nss);
+      evt_.nUD.push_back(nuds);
+      evt_.nMatchOther.push_back(nmatchothers);
+      evt_.nOther.push_back(nothers);
+      evt_.ProbB.push_back(probb);
+      evt_.ProbC.push_back(probc);
+
+      evt_.matchedGenIsHardProcess.push_back(matchGenIsHardProcess);
+      evt_.matchedGenIsLastCopyBeforeFSR.push_back(matchGenIsLastCopyBeforeFSR);
+      evt_.matchedGenPtSV.push_back(matchGenPt);
+      evt_.matchedGenEtaSV.push_back(matchGenEta);
+      evt_.matchedGenMassSV.push_back(matchGenMass);
+      evt_.matchedGenPhiSV.push_back(matchGenPhi);
+      evt_.matchedGenEnergySV.push_back(matchGenEnergy);
+      evt_.matchedGenMomSV.push_back(matchGenMomID);
+      evt_.matchedGenMindRSV.push_back(mindR);
+      evt_.matchedGendRSV.push_back(matchGenSVdR);
+
    }
    //std::cout << "???" << std::endl; 
+   tree_->Fill();
 }
 
 // ------------ method called once each run ----------------
